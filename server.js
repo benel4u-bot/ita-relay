@@ -1,5 +1,5 @@
 const express = require("express");
-const fetch = require("node-fetch");
+const axios = require("axios");
 const { HttpsProxyAgent } = require("https-proxy-agent");
 
 const app = express();
@@ -8,8 +8,14 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const PROXY_URL = process.env.HTTP_PROXY_URL;
 
+console.log(`Starting ITA Relay...`);
+console.log(`Proxy: ${PROXY_URL ? "configured ✓" : "NOT configured ✗"}`);
+
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", proxy: PROXY_URL ? "configured" : "not configured" });
+  res.json({ 
+    status: "ok", 
+    proxy: PROXY_URL ? "configured" : "not configured" 
+  });
 });
 
 app.post("/api/ita-relay", async (req, res) => {
@@ -20,28 +26,24 @@ app.post("/api/ita-relay", async (req, res) => {
   }
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
-  console.log(`[ITA-Relay] Proxy: ${PROXY_URL ? "enabled" : "disabled"}`);
 
   try {
     const agent = PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined;
 
-    const response = await fetch(url, {
+    const response = await axios({
       method,
+      url,
       headers,
-      body: body || undefined,
-      agent,
+      data: body || undefined,
+      httpsAgent: agent,
+      proxy: false, // חשוב: מונע מ-axios להשתמש ב-proxy משלו
+      validateStatus: () => true, // מחזיר את כל ה-status codes בלי לזרוק שגיאה
+      responseType: "text",
     });
 
-    const responseText = await response.text();
-    console.log(`[ITA-Relay] Response status: ${response.status}`);
+    console.log(`[ITA-Relay] Response: ${response.status}`);
 
-    // העבר את כל ה-headers בחזרה
-    const responseHeaders = {};
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value;
-    });
-
-    res.status(response.status).set(responseHeaders).send(responseText);
+    res.status(response.status).set(response.headers).send(response.data);
 
   } catch (err) {
     console.error("[ITA-Relay] Error:", err.message);
@@ -51,5 +53,4 @@ app.post("/api/ita-relay", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`ITA Relay running on port ${PORT}`);
-  console.log(`Proxy: ${PROXY_URL || "not configured"}`);
 });
