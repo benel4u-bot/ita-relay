@@ -12,10 +12,7 @@ console.log(`Starting ITA Relay...`);
 console.log(`Proxy: ${PROXY_URL ? "configured ✓" : "NOT configured ✗"}`);
 
 app.get("/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    proxy: PROXY_URL ? "configured" : "not configured" 
-  });
+  res.json({ status: "ok", proxy: PROXY_URL ? "configured" : "not configured" });
 });
 
 app.post("/api/ita-relay", async (req, res) => {
@@ -27,23 +24,38 @@ app.post("/api/ita-relay", async (req, res) => {
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
 
+  // נרמל את ה-headers — ודא שהם נשלחים בפורמט הנכון
+  const normalizedHeaders = {};
+  for (const [key, value] of Object.entries(headers)) {
+    normalizedHeaders[key.toLowerCase()] = value;
+  }
+
+  // ודא ש-content-type נשמר בדיוק
+  const contentType = normalizedHeaders["content-type"] || "application/json";
+
   try {
     const agent = PROXY_URL ? new HttpsProxyAgent(PROXY_URL) : undefined;
 
     const response = await axios({
       method,
       url,
-      headers,
+      headers: {
+        ...normalizedHeaders,
+        "content-type": contentType,
+      },
       data: body || undefined,
       httpsAgent: agent,
-      proxy: false, // חשוב: מונע מ-axios להשתמש ב-proxy משלו
-      validateStatus: () => true, // מחזיר את כל ה-status codes בלי לזרוק שגיאה
+      proxy: false,
+      validateStatus: () => true,
       responseType: "text",
+      // מנע axios מלהוסיף headers מיותרים
+      transformRequest: [(data) => data],
     });
 
     console.log(`[ITA-Relay] Response: ${response.status}`);
+    console.log(`[ITA-Relay] Response body: ${response.data?.substring(0, 200)}`);
 
-    res.status(response.status).set(response.headers).send(response.data);
+    res.status(response.status).send(response.data);
 
   } catch (err) {
     console.error("[ITA-Relay] Error:", err.message);
