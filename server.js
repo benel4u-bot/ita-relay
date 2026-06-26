@@ -23,6 +23,9 @@ app.post("/api/ita-relay", async (req, res) => {
   }
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
+  
+  // שורת הקסם החדשה: מדפיסה ללוג של רנדר את ה-JSON המלא כדי שנראה מי קיבל גרשיים בטעות
+  console.log(`[ITA-Relay] Incoming Payload Body:`, typeof body === 'object' ? JSON.stringify(body, null, 2) : body);
 
   // נרמל את ה-headers — ודא שהם נשלחים בפורמט הנכון
   const normalizedHeaders = {};
