@@ -23,31 +23,6 @@ app.post("/api/ita-relay", async (req, res) => {
   }
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
-  
-  // מגן לייזר: החלפת טקסט גורפת על ה-string הגולמי כדי להכריח גרשיים על השדה הסורר
-  try {
-    let rawString = typeof body === "string" ? body : JSON.stringify(body);
-    
-    // החלפה ישירה של מספר התוכנה החשוף למבנה עם גרשיים
-    if (rawString && rawString.includes('"Accounting_Software_Number":99999999')) {
-      rawString = rawString.replace('"Accounting_Software_Number":99999999', '"Accounting_Software_Number":"99999999"');
-    }
-    
-    // החלפה של שאר שדות הסיווג ליתר ביטחון אם חזרו להיות מספרים
-    if (rawString) {
-      rawString = rawString.replace('"Invoice_Type":305', '"Invoice_Type":"305"');
-      rawString = rawString.replace('"Branch_ID":0', '"Branch_ID":"0"');
-      rawString = rawString.replace('"Customer_Type":1', '"Customer_Type":"1"');
-    }
-
-    // הגדרה מחדש של ה-body כטקסט מעובד וסגור
-    body = rawString;
-  } catch (e) {
-    console.log("[ITA-Relay] Laser bypass error:", e.message);
-  }
-
-  // מדפיס ללוג של רנדר את ה-JSON המלא והסופי שנשלח
-  console.log(`[ITA-Relay] Incoming Payload Body:`, body);
 
   // נרמל את ה-headers — ודא שהם נשלחים בפורמט הנכון
   const normalizedHeaders = {};
@@ -55,7 +30,6 @@ app.post("/api/ita-relay", async (req, res) => {
     normalizedHeaders[key.toLowerCase()] = value;
   }
 
-  // ודא ש-content-type נשמר בדיוק
   const contentType = normalizedHeaders["content-type"] || "application/json";
 
   try {
@@ -73,8 +47,21 @@ app.post("/api/ita-relay", async (req, res) => {
       proxy: false,
       validateStatus: () => true,
       responseType: "text",
-      // מנע axios מלהוסיף headers מיותרים
-      transformRequest: [(data) => data],
+      // מגן ברזל סופי: החלפת טקסט אגרסיבית ישירות על הסטרינג שיוצא מה-Axios פיזית לרשת!
+      transformRequest: [
+        (data) => {
+          let str = typeof data === "string" ? data : JSON.stringify(data);
+          if (str) {
+            // מחליף את כל המספרים החשופים לסטרינגים עם גרשיים באופן גורף
+            str = str.replace(/"Accounting_Software_Number"\s*:\s*99999999/g, '"Accounting_Software_Number":"99999999"');
+            str = str.replace(/"Invoice_Type"\s*:\s*305/g, '"Invoice_Type":"305"');
+            str = str.replace(/"Branch_ID"\s*:\s*0/g, '"Branch_ID":"0"');
+            str = str.replace(/"Customer_Type"\s*:\s*1/g, '"Customer_Type":"1"');
+          }
+          console.log("[ITA-Relay] Ultra Final Wire Payload:", str);
+          return str;
+        }
+      ],
     });
 
     console.log(`[ITA-Relay] Response: ${response.status}`);
