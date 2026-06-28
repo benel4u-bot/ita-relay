@@ -32,18 +32,32 @@ app.post("/api/ita-relay", async (req, res) => {
     let obj = isString ? JSON.parse(bodyData) : bodyData;
 
     if (obj && typeof obj === "object") {
-      // 1. הזרקת שדות חובה של V2 שאולי חסרים בלאבאבול ומשגעים את שע"ם
-      if (obj.Discount_Amount === undefined) obj.Discount_Amount = 0.0;
-      if (obj.Property_Type === undefined) obj.Property_Type = "1"; // 1 מייצג שירות/טובין רגיל
-      if (obj.Payment_Method === undefined) obj.Payment_Method = "3"; // 3 מייצג כרטיס אשראי (או "6" להעברה)
+      // 1. הזרקת שדות חובה של V2
+      obj.Discount_Amount = 0.0;
+      obj.Property_Type = "1"; 
+      obj.Payment_Method = "3"; 
 
-      // 2. המרה קשיחה של סכומים למספרים עשרוניים (.0) למניעת שגיאות integer
-      if (obj.Amount_Before_Discount) obj.Amount_Before_Discount = parseFloat(obj.Amount_Before_Discount).toFixed(1);
-      if (obj.Payment_Amount) obj.Payment_Amount = parseFloat(obj.Payment_Amount).toFixed(1);
-      if (obj.VAT_Amount) obj.VAT_Amount = parseFloat(obj.VAT_Amount).toFixed(1);
-      if (obj.Payment_Amount_Including_VAT) obj.Payment_Amount_Including_VAT = parseFloat(obj.Payment_Amount_Including_VAT).toFixed(1);
+      // 2. המרה קשיחה של סכומים ב-Root למספרים (Numbers) ולא סטרינגים
+      if (obj.Amount_Before_Discount) obj.Amount_Before_Discount = Number(parseFloat(obj.Amount_Before_Discount).toFixed(2));
+      if (obj.Payment_Amount) obj.Payment_Amount = Number(parseFloat(obj.Payment_Amount).toFixed(2));
+      if (obj.VAT_Amount) obj.VAT_Amount = Number(parseFloat(obj.VAT_Amount).toFixed(2));
+      if (obj.Payment_Amount_Including_VAT) obj.Payment_Amount_Including_VAT = Number(parseFloat(obj.Payment_Amount_Including_VAT).toFixed(2));
 
-      // 3. המרה קשיחה של מזהים וסיווגים לסטרינגים עם גרשיים
+      // 3. המרה קשיחה של שדות פנימיים בתוך ה-Items למספרים עשרוניים (Numbers)
+      if (obj.Items && Array.isArray(obj.Items)) {
+        obj.Items = obj.Items.map(item => {
+          return {
+            ...item,
+            Quantity: Number(parseFloat(item.Quantity || 1).toFixed(2)),
+            Price_Per_Unit: Number(parseFloat(item.Price_Per_Unit || 0).toFixed(2)),
+            Total_Amount: Number(parseFloat(item.Total_Amount || 0).toFixed(2)),
+            VAT_Rate: Number(parseFloat(item.VAT_Rate || 0).toFixed(2)),
+            VAT_Amount: Number(parseFloat(item.VAT_Amount || 0).toFixed(2))
+          };
+        });
+      }
+
+      // 4. המרה קשיחה של מזהים וסיווגים לסטרינגים עם גרשיים
       if (obj.Vat_Number) obj.Vat_Number = String(obj.Vat_Number);
       if (obj.Customer_VAT_Number) obj.Customer_VAT_Number = String(obj.Customer_VAT_Number);
       if (obj.Accounting_Software_Number) obj.Accounting_Software_Number = String(obj.Accounting_Software_Number);
@@ -51,14 +65,13 @@ app.post("/api/ita-relay", async (req, res) => {
       if (obj.Branch_ID) obj.Branch_ID = String(obj.Branch_ID);
       if (obj.Customer_Type) obj.Customer_Type = String(obj.Customer_Type);
 
-      // עדכון ה-body המעובד
       bodyData = obj;
     }
   } catch (e) {
-    console.log("[ITA-Relay] Data Injection Error:", e.message);
+    console.log("[ITA-Relay] Advanced Normalization Error:", e.message);
   }
 
-  // הדפסה נקייה ללוג כדי שנוכל לראות את המבנה המוזרק והשלם
+  // הדפסה ללוג
   console.log(`[ITA-Relay] Prepared Payload Body:`, JSON.stringify(bodyData));
 
   const normalizedHeaders = {};
