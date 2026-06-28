@@ -16,15 +16,40 @@ app.get("/health", (req, res) => {
 });
 
 app.post("/api/ita-relay", async (req, res) => {
-  let { url, method = "POST", headers = {}, body } = req.body;
+  // תפיסת הנתונים הגולמיים מהאובייקט שנשלח
+  let targetUrl = req.body.url;
+  let method = req.body.method || "POST";
+  let headers = req.body.headers || {};
+  let bodyData = req.body.body;
 
-  if (!url) {
+  if (!targetUrl) {
     return res.status(400).json({ error: "Missing target URL" });
   }
 
-  console.log(`[ITA-Relay] ${method} → ${url}`);
+  console.log(`[ITA-Relay] ${method} → ${targetUrl}`);
 
-  // נרמל את ה-headers — ודא שהם נשלחים בפורמט הנכון
+  // מגן לייזר אגרסיבי: החלפת טקסט ישירה על הנתונים, לא משנה מה הטיפוס שלהם!
+  try {
+    let isString = (typeof bodyData === "string");
+    let str = isString ? bodyData : JSON.stringify(bodyData);
+
+    if (str) {
+      // החלפה גורפת של מספר התוכנה ושאר שדות הסיווג לסטרינגים עם גרשיים
+      str = str.replace(/"Accounting_Software_Number"\s*:\s*99999999/g, '"Accounting_Software_Number":"99999999"');
+      str = str.replace(/"Invoice_Type"\s*:\s*305/g, '"Invoice_Type":"305"');
+      str = str.replace(/"Branch_ID"\s*:\s*0/g, '"Branch_ID":"0"');
+      str = str.replace(/"Customer_Type"\s*:\s*1/g, '"Customer_Type":"1"');
+      
+      // החזרת הנתונים למצבם המקורי (אובייקט או סטרינג) אבל מעובדים ומיושרים
+      bodyData = isString ? str : JSON.parse(str);
+    }
+  } catch (e) {
+    console.log("[ITA-Relay] Force replacement error:", e.message);
+  }
+
+  // מדפיס ללוג בדיוק את מה שהולך להישלח פיזית
+  console.log(`[ITA-Relay] Prepared Payload Body:`, typeof bodyData === "object" ? JSON.stringify(bodyData) : bodyData);
+
   const normalizedHeaders = {};
   for (const [key, value] of Object.entries(headers)) {
     normalizedHeaders[key.toLowerCase()] = value;
@@ -37,31 +62,17 @@ app.post("/api/ita-relay", async (req, res) => {
 
     const response = await axios({
       method,
-      url,
+      url: targetUrl,
       headers: {
         ...normalizedHeaders,
         "content-type": contentType,
       },
-      data: body || undefined,
+      data: bodyData || undefined,
       httpsAgent: agent,
       proxy: false,
       validateStatus: () => true,
       responseType: "text",
-      // מגן ברזל סופי: החלפת טקסט אגרסיבית ישירות על הסטרינג שיוצא מה-Axios פיזית לרשת!
-      transformRequest: [
-        (data) => {
-          let str = typeof data === "string" ? data : JSON.stringify(data);
-          if (str) {
-            // מחליף את כל המספרים החשופים לסטרינגים עם גרשיים באופן גורף
-            str = str.replace(/"Accounting_Software_Number"\s*:\s*99999999/g, '"Accounting_Software_Number":"99999999"');
-            str = str.replace(/"Invoice_Type"\s*:\s*305/g, '"Invoice_Type":"305"');
-            str = str.replace(/"Branch_ID"\s*:\s*0/g, '"Branch_ID":"0"');
-            str = str.replace(/"Customer_Type"\s*:\s*1/g, '"Customer_Type":"1"');
-          }
-          console.log("[ITA-Relay] Ultra Final Wire Payload:", str);
-          return str;
-        }
-      ],
+      transformRequest: [(data) => (typeof data === "string" ? data : JSON.stringify(data))],
     });
 
     console.log(`[ITA-Relay] Response: ${response.status}`);
