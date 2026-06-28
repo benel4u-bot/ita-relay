@@ -24,25 +24,30 @@ app.post("/api/ita-relay", async (req, res) => {
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
   
-  // מגן ברזל: מפרק את ה-body, מתקן את כל שדות הסיווג לטקסט עם גרשיים, ואורז מחדש
+  // מגן לייזר: החלפת טקסט גורפת על ה-string הגולמי כדי להכריח גרשיים על השדה הסורר
   try {
-    let parsedBody = typeof body === "string" ? JSON.parse(body) : body;
+    let rawString = typeof body === "string" ? body : JSON.stringify(body);
     
-    if (parsedBody && typeof parsedBody === "object") {
-      if (parsedBody.Invoice_Type !== undefined) parsedBody.Invoice_Type = String(parsedBody.Invoice_Type);
-      if (parsedBody.Branch_ID !== undefined) parsedBody.Branch_ID = String(parsedBody.Branch_ID);
-      if (parsedBody.Customer_Type !== undefined) parsedBody.Customer_Type = String(parsedBody.Customer_Type);
-      if (parsedBody.Accounting_Software_Number !== undefined) parsedBody.Accounting_Software_Number = String(parsedBody.Accounting_Software_Number);
-      
-      // מחזיר את ה-body המתוקן למבנה המקורי שלו
-      body = typeof req.body.body === "string" ? JSON.stringify(parsedBody) : parsedBody;
+    // החלפה ישירה של מספר התוכנה החשוף למבנה עם גרשיים
+    if (rawString && rawString.includes('"Accounting_Software_Number":99999999')) {
+      rawString = rawString.replace('"Accounting_Software_Number":99999999', '"Accounting_Software_Number":"99999999"');
     }
+    
+    // החלפה של שאר שדות הסיווג ליתר ביטחון אם חזרו להיות מספרים
+    if (rawString) {
+      rawString = rawString.replace('"Invoice_Type":305', '"Invoice_Type":"305"');
+      rawString = rawString.replace('"Branch_ID":0', '"Branch_ID":"0"');
+      rawString = rawString.replace('"Customer_Type":1', '"Customer_Type":"1"');
+    }
+
+    // הגדרה מחדש של ה-body כטקסט מעובד וסגור
+    body = rawString;
   } catch (e) {
-    console.log("[ITA-Relay] Body parse bypass:", e.message);
+    console.log("[ITA-Relay] Laser bypass error:", e.message);
   }
 
   // מדפיס ללוג של רנדר את ה-JSON המלא והסופי שנשלח
-  console.log(`[ITA-Relay] Incoming Payload Body:`, typeof body === 'object' ? JSON.stringify(body, null, 2) : body);
+  console.log(`[ITA-Relay] Incoming Payload Body:`, body);
 
   // נרמל את ה-headers — ודא שהם נשלחים בפורמט הנכון
   const normalizedHeaders = {};
