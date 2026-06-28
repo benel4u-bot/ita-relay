@@ -16,7 +16,6 @@ app.get("/health", (req, res) => {
 });
 
 app.post("/api/ita-relay", async (req, res) => {
-  // תפיסת הנתונים הגולמיים מהאובייקט שנשלח
   let targetUrl = req.body.url;
   let method = req.body.method || "POST";
   let headers = req.body.headers || {};
@@ -28,26 +27,28 @@ app.post("/api/ita-relay", async (req, res) => {
 
   console.log(`[ITA-Relay] ${method} → ${targetUrl}`);
 
-  // מגן לייזר אגרסיבי: החלפת טקסט ישירה על הנתונים, לא משנה מה הטיפוס שלהם!
+  // מגן לייזר מורחב: הופך גם את מספרי הח"פ לסטרינגים עם גרשיים בכוח!
   try {
     let isString = (typeof bodyData === "string");
     let str = isString ? bodyData : JSON.stringify(bodyData);
 
     if (str) {
-      // החלפה גורפת של מספר התוכנה ושאר שדות הסיווג לסטרינגים עם גרשיים
+      // 1. תיקון מספרי הח"פ (העסק והלקוח) מאינטג'ר לסטרינג
+      str = str.replace(/"Vat_Number"\s*:\s*200342426/g, '"Vat_Number":"200342426"');
+      str = str.replace(/"Customer_VAT_Number"\s*:\s*511234567/g, '"Customer_VAT_Number":"511234567"');
+
+      // 2. תיקון שאר שדות הסיווג והתוכנה
       str = str.replace(/"Accounting_Software_Number"\s*:\s*99999999/g, '"Accounting_Software_Number":"99999999"');
       str = str.replace(/"Invoice_Type"\s*:\s*305/g, '"Invoice_Type":"305"');
       str = str.replace(/"Branch_ID"\s*:\s*0/g, '"Branch_ID":"0"');
       str = str.replace(/"Customer_Type"\s*:\s*1/g, '"Customer_Type":"1"');
       
-      // החזרת הנתונים למצבם המקורי (אובייקט או סטרינג) אבל מעובדים ומיושרים
       bodyData = isString ? str : JSON.parse(str);
     }
   } catch (e) {
     console.log("[ITA-Relay] Force replacement error:", e.message);
   }
 
-  // מדפיס ללוג בדיוק את מה שהולך להישלח פיזית
   console.log(`[ITA-Relay] Prepared Payload Body:`, typeof bodyData === "object" ? JSON.stringify(bodyData) : bodyData);
 
   const normalizedHeaders = {};
