@@ -24,7 +24,14 @@ app.post("/api/ita-relay", async (req, res) => {
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
   
-  // שורת הקסם החדשה: מדפיסה ללוג של רנדר את ה-JSON המלא כדי שנראה מי קיבל גרשיים בטעות
+  // מגן קשיח: ודא ששדות הסיווג הופכים לסטרינגים עם גרשיים בכוח, לא משנה מה לאבאבול שלח!
+  if (body && typeof body === "object") {
+    if (body.Invoice_Type !== undefined) body.Invoice_Type = String(body.Invoice_Type);
+    if (body.Branch_ID !== undefined) body.Branch_ID = String(body.Branch_ID);
+    if (body.Customer_Type !== undefined) body.Customer_Type = String(body.Customer_Type);
+  }
+
+  // מדפיס ללוג של רנדר את ה-JSON המלא אחרי התיקון של הריליי
   console.log(`[ITA-Relay] Incoming Payload Body:`, typeof body === 'object' ? JSON.stringify(body, null, 2) : body);
 
   // נרמל את ה-headers — ודא שהם נשלחים בפורמט הנכון
