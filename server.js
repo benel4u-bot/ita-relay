@@ -24,11 +24,12 @@ app.post("/api/ita-relay", async (req, res) => {
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
   
-  // מגן קשיח: ודא ששדות הסיווג הופכים לסטרינגים עם גרשיים בכוח, לא משנה מה לאבאבול שלח!
+  // מגן קשיח: הופך את כל שדות הסיווג ומספר התוכנה לסטרינגים בכוח לפני השליחה
   if (body && typeof body === "object") {
     if (body.Invoice_Type !== undefined) body.Invoice_Type = String(body.Invoice_Type);
     if (body.Branch_ID !== undefined) body.Branch_ID = String(body.Branch_ID);
     if (body.Customer_Type !== undefined) body.Customer_Type = String(body.Customer_Type);
+    if (body.Accounting_Software_Number !== undefined) body.Accounting_Software_Number = String(body.Accounting_Software_Number);
   }
 
   // מדפיס ללוג של רנדר את ה-JSON המלא אחרי התיקון של הריליי
