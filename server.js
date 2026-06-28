@@ -16,7 +16,7 @@ app.get("/health", (req, res) => {
 });
 
 app.post("/api/ita-relay", async (req, res) => {
-  const { url, method = "POST", headers = {}, body } = req.body;
+  let { url, method = "POST", headers = {}, body } = req.body;
 
   if (!url) {
     return res.status(400).json({ error: "Missing target URL" });
@@ -24,15 +24,24 @@ app.post("/api/ita-relay", async (req, res) => {
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
   
-  // מגן קשיח מתוקן: הופך את כל ארבעת השדות לסטרינגים בצורה ישירה ובטוחה
-  if (body) {
-    if (body.Invoice_Type !== undefined) body.Invoice_Type = String(body.Invoice_Type);
-    if (body.Branch_ID !== undefined) body.Branch_ID = String(body.Branch_ID);
-    if (body.Customer_Type !== undefined) body.Customer_Type = String(body.Customer_Type);
-    if (body.Accounting_Software_Number !== undefined) body.Accounting_Software_Number = String(body.Accounting_Software_Number);
+  // מגן ברזל: מפרק את ה-body, מתקן את כל שדות הסיווג לטקסט עם גרשיים, ואורז מחדש
+  try {
+    let parsedBody = typeof body === "string" ? JSON.parse(body) : body;
+    
+    if (parsedBody && typeof parsedBody === "object") {
+      if (parsedBody.Invoice_Type !== undefined) parsedBody.Invoice_Type = String(parsedBody.Invoice_Type);
+      if (parsedBody.Branch_ID !== undefined) parsedBody.Branch_ID = String(parsedBody.Branch_ID);
+      if (parsedBody.Customer_Type !== undefined) parsedBody.Customer_Type = String(parsedBody.Customer_Type);
+      if (parsedBody.Accounting_Software_Number !== undefined) parsedBody.Accounting_Software_Number = String(parsedBody.Accounting_Software_Number);
+      
+      // מחזיר את ה-body המתוקן למבנה המקורי שלו
+      body = typeof req.body.body === "string" ? JSON.stringify(parsedBody) : parsedBody;
+    }
+  } catch (e) {
+    console.log("[ITA-Relay] Body parse bypass:", e.message);
   }
 
-  // מדפיס ללוג של רנדר את ה-JSON המלא אחרי התיקון של הריליי
+  // מדפיס ללוג של רנדר את ה-JSON המלא והסופי שנשלח
   console.log(`[ITA-Relay] Incoming Payload Body:`, typeof body === 'object' ? JSON.stringify(body, null, 2) : body);
 
   // נרמל את ה-headers — ודא שהם נשלחים בפורמט הנכון
