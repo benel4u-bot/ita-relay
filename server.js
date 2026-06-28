@@ -24,8 +24,8 @@ app.post("/api/ita-relay", async (req, res) => {
 
   console.log(`[ITA-Relay] ${method} → ${url}`);
   
-  // מגן קשיח: הופך את כל שדות הסיווג ומספר התוכנה לסטרינגים בכוח לפני השליחה
-  if (body && typeof body === "object") {
+  // מגן קשיח מתוקן: הופך את כל ארבעת השדות לסטרינגים בצורה ישירה ובטוחה
+  if (body) {
     if (body.Invoice_Type !== undefined) body.Invoice_Type = String(body.Invoice_Type);
     if (body.Branch_ID !== undefined) body.Branch_ID = String(body.Branch_ID);
     if (body.Customer_Type !== undefined) body.Customer_Type = String(body.Customer_Type);
