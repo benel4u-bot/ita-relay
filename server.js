@@ -27,29 +27,39 @@ app.post("/api/ita-relay", async (req, res) => {
 
   console.log(`[ITA-Relay] ${method} → ${targetUrl}`);
 
-  // מגן לייזר מורחב: הופך גם את מספרי הח"פ לסטרינגים עם גרשיים בכוח!
   try {
     let isString = (typeof bodyData === "string");
-    let str = isString ? bodyData : JSON.stringify(bodyData);
+    let obj = isString ? JSON.parse(bodyData) : bodyData;
 
-    if (str) {
-      // 1. תיקון מספרי הח"פ (העסק והלקוח) מאינטג'ר לסטרינג
-      str = str.replace(/"Vat_Number"\s*:\s*200342426/g, '"Vat_Number":"200342426"');
-      str = str.replace(/"Customer_VAT_Number"\s*:\s*511234567/g, '"Customer_VAT_Number":"511234567"');
+    if (obj && typeof obj === "object") {
+      // 1. הזרקת שדות חובה של V2 שאולי חסרים בלאבאבול ומשגעים את שע"ם
+      if (obj.Discount_Amount === undefined) obj.Discount_Amount = 0.0;
+      if (obj.Property_Type === undefined) obj.Property_Type = "1"; // 1 מייצג שירות/טובין רגיל
+      if (obj.Payment_Method === undefined) obj.Payment_Method = "3"; // 3 מייצג כרטיס אשראי (או "6" להעברה)
 
-      // 2. תיקון שאר שדות הסיווג והתוכנה
-      str = str.replace(/"Accounting_Software_Number"\s*:\s*99999999/g, '"Accounting_Software_Number":"99999999"');
-      str = str.replace(/"Invoice_Type"\s*:\s*305/g, '"Invoice_Type":"305"');
-      str = str.replace(/"Branch_ID"\s*:\s*0/g, '"Branch_ID":"0"');
-      str = str.replace(/"Customer_Type"\s*:\s*1/g, '"Customer_Type":"1"');
-      
-      bodyData = isString ? str : JSON.parse(str);
+      // 2. המרה קשיחה של סכומים למספרים עשרוניים (.0) למניעת שגיאות integer
+      if (obj.Amount_Before_Discount) obj.Amount_Before_Discount = parseFloat(obj.Amount_Before_Discount).toFixed(1);
+      if (obj.Payment_Amount) obj.Payment_Amount = parseFloat(obj.Payment_Amount).toFixed(1);
+      if (obj.VAT_Amount) obj.VAT_Amount = parseFloat(obj.VAT_Amount).toFixed(1);
+      if (obj.Payment_Amount_Including_VAT) obj.Payment_Amount_Including_VAT = parseFloat(obj.Payment_Amount_Including_VAT).toFixed(1);
+
+      // 3. המרה קשיחה של מזהים וסיווגים לסטרינגים עם גרשיים
+      if (obj.Vat_Number) obj.Vat_Number = String(obj.Vat_Number);
+      if (obj.Customer_VAT_Number) obj.Customer_VAT_Number = String(obj.Customer_VAT_Number);
+      if (obj.Accounting_Software_Number) obj.Accounting_Software_Number = String(obj.Accounting_Software_Number);
+      if (obj.Invoice_Type) obj.Invoice_Type = String(obj.Invoice_Type);
+      if (obj.Branch_ID) obj.Branch_ID = String(obj.Branch_ID);
+      if (obj.Customer_Type) obj.Customer_Type = String(obj.Customer_Type);
+
+      // עדכון ה-body המעובד
+      bodyData = obj;
     }
   } catch (e) {
-    console.log("[ITA-Relay] Force replacement error:", e.message);
+    console.log("[ITA-Relay] Data Injection Error:", e.message);
   }
 
-  console.log(`[ITA-Relay] Prepared Payload Body:`, typeof bodyData === "object" ? JSON.stringify(bodyData) : bodyData);
+  // הדפסה נקייה ללוג כדי שנוכל לראות את המבנה המוזרק והשלם
+  console.log(`[ITA-Relay] Prepared Payload Body:`, JSON.stringify(bodyData));
 
   const normalizedHeaders = {};
   for (const [key, value] of Object.entries(headers)) {
@@ -73,7 +83,6 @@ app.post("/api/ita-relay", async (req, res) => {
       proxy: false,
       validateStatus: () => true,
       responseType: "text",
-      transformRequest: [(data) => (typeof data === "string" ? data : JSON.stringify(data))],
     });
 
     console.log(`[ITA-Relay] Response: ${response.status}`);
