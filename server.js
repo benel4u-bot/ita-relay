@@ -32,47 +32,48 @@ app.post("/api/ita-relay", async (req, res) => {
     let obj = isString ? JSON.parse(bodyData) : bodyData;
 
     if (obj && typeof obj === "object") {
-      // 1. הזרקת שדות חובה של V2
-      obj.Discount_Amount = 0.0;
-      obj.Property_Type = "1"; 
-      obj.Payment_Method = "3"; 
+      
+      // 1. שדות טקסט (A) -> חייבים להיות String עם גרשיים לפי המפרט
+      if (obj.Invoice_ID) obj.Invoice_ID = String(obj.Invoice_ID);
+      if (obj.Invoice_Reference_Number) obj.Invoice_Reference_Number = String(obj.Invoice_Reference_Number);
+      if (obj.Branch_ID) obj.Branch_ID = String(obj.Branch_ID);
+      if (obj.Customer_Name) obj.Customer_Name = String(obj.Customer_Name);
+      if (obj.Invoice_Date) obj.Invoice_Date = String(obj.Invoice_Date);
+      if (obj.Invoice_Issuance_Date) obj.Invoice_Issuance_Date = String(obj.Invoice_Issuance_Date);
 
-      // 2. המרה קשיחה של סכומים ב-Root למספרים (Numbers) ולא סטרינגים
+      // 2. שדות מספרים שלמים (N) -> חייבים להיות Integer נקי ללא גרשיים לפי המפרט
+      if (obj.Invoice_Type) obj.Invoice_Type = parseInt(obj.Invoice_Type, 10);
+      if (obj.Vat_Number) obj.Vat_Number = parseInt(obj.Vat_Number, 10);
+      if (obj.Customer_VAT_Number) obj.Customer_VAT_Number = parseInt(obj.Customer_VAT_Number, 10);
+      if (obj.Customer_Type) obj.Customer_Type = parseInt(obj.Customer_Type, 10);
+      if (obj.Accounting_Software_Number) obj.Accounting_Software_Number = parseInt(obj.Accounting_Software_Number, 10);
+
+      // 3. שדות סכומים (N12.2) -> מספרים עשרוניים (Float) ללא גרשיים
       if (obj.Amount_Before_Discount) obj.Amount_Before_Discount = Number(parseFloat(obj.Amount_Before_Discount).toFixed(2));
       if (obj.Payment_Amount) obj.Payment_Amount = Number(parseFloat(obj.Payment_Amount).toFixed(2));
       if (obj.VAT_Amount) obj.VAT_Amount = Number(parseFloat(obj.VAT_Amount).toFixed(2));
       if (obj.Payment_Amount_Including_VAT) obj.Payment_Amount_Including_VAT = Number(parseFloat(obj.Payment_Amount_Including_VAT).toFixed(2));
 
-      // 3. המרה קשיחה של שדות פנימיים בתוך ה-Items למספרים עשרוניים (Numbers)
+      // 4. נרמול פריטים בתוך מערך Items
       if (obj.Items && Array.isArray(obj.Items)) {
-        obj.Items = obj.Items.map(item => {
-          return {
-            ...item,
-            Quantity: Number(parseFloat(item.Quantity || 1).toFixed(2)),
-            Price_Per_Unit: Number(parseFloat(item.Price_Per_Unit || 0).toFixed(2)),
-            Total_Amount: Number(parseFloat(item.Total_Amount || 0).toFixed(2)),
-            VAT_Rate: Number(parseFloat(item.VAT_Rate || 0).toFixed(2)),
-            VAT_Amount: Number(parseFloat(item.VAT_Amount || 0).toFixed(2))
-          };
-        });
+        obj.Items = obj.Items.map(item => ({
+          Index: parseInt(item.Index || 1, 10),
+          Description: String(item.Description || "בדיקה"),
+          Quantity: Number(parseFloat(item.Quantity || 1).toFixed(2)),
+          Price_Per_Unit: Number(parseFloat(item.Price_Per_Unit || 0).toFixed(2)),
+          Total_Amount: Number(parseFloat(item.Total_Amount || 0).toFixed(2)),
+          VAT_Rate: Number(parseFloat(item.VAT_Rate || 0).toFixed(2)),
+          VAT_Amount: Number(parseFloat(item.VAT_Amount || 0).toFixed(2))
+        }));
       }
-
-      // 4. המרה קשיחה של מזהים וסיווגים לסטרינגים עם גרשיים
-      if (obj.Vat_Number) obj.Vat_Number = String(obj.Vat_Number);
-      if (obj.Customer_VAT_Number) obj.Customer_VAT_Number = String(obj.Customer_VAT_Number);
-      if (obj.Accounting_Software_Number) obj.Accounting_Software_Number = String(obj.Accounting_Software_Number);
-      if (obj.Invoice_Type) obj.Invoice_Type = String(obj.Invoice_Type);
-      if (obj.Branch_ID) obj.Branch_ID = String(obj.Branch_ID);
-      if (obj.Customer_Type) obj.Customer_Type = String(obj.Customer_Type);
 
       bodyData = obj;
     }
   } catch (e) {
-    console.log("[ITA-Relay] Advanced Normalization Error:", e.message);
+    console.log("[ITA-Relay] Document Specs Normalization Error:", e.message);
   }
 
-  // הדפסה ללוג
-  console.log(`[ITA-Relay] Prepared Payload Body:`, JSON.stringify(bodyData));
+  console.log(`[ITA-Relay] Official Spec Body:`, JSON.stringify(bodyData));
 
   const normalizedHeaders = {};
   for (const [key, value] of Object.entries(headers)) {
@@ -111,4 +112,4 @@ app.post("/api/ita-relay", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`ITA Relay running on port ${PORT}`);
-});
+ });
