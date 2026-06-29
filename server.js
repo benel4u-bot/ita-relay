@@ -33,20 +33,22 @@ app.post("/api/ita-relay", async (req, res) => {
 
     if (obj && typeof obj === "object") {
       
-      // 1. שדות טקסט (A) -> חייבים להיות String עם גרשיים לפי המפרט
+      // 1. שדות טקסט (A) -> חייבים להיות String עם גרשיים
       if (obj.Invoice_ID) obj.Invoice_ID = String(obj.Invoice_ID);
       if (obj.Invoice_Reference_Number) obj.Invoice_Reference_Number = String(obj.Invoice_Reference_Number);
-      if (obj.Branch_ID) obj.Branch_ID = String(obj.Branch_ID);
       if (obj.Customer_Name) obj.Customer_Name = String(obj.Customer_Name);
       if (obj.Invoice_Date) obj.Invoice_Date = String(obj.Invoice_Date);
       if (obj.Invoice_Issuance_Date) obj.Invoice_Issuance_Date = String(obj.Invoice_Issuance_Date);
 
-      // 2. שדות מספרים שלמים (N) -> חייבים להיות Integer נקי ללא גרשיים לפי המפרט
+      // 2. שדות מספרים שלמים (N) -> חייבים להיות Integer נקי ללא גרשיים
       if (obj.Invoice_Type) obj.Invoice_Type = parseInt(obj.Invoice_Type, 10);
       if (obj.Vat_Number) obj.Vat_Number = parseInt(obj.Vat_Number, 10);
-      if (obj.Customer_VAT_Number) obj.Customer_VAT_Number = parseInt(obj.Customer_VAT_Number, 10);
+      if (obj.Customer_VAT_Number) obj.Customer_VAT_Number = parseInt(obj.Customer_VAT_Number);
       if (obj.Customer_Type) obj.Customer_Type = parseInt(obj.Customer_Type, 10);
       if (obj.Accounting_Software_Number) obj.Accounting_Software_Number = parseInt(obj.Accounting_Software_Number, 10);
+      
+      // תיקון Branch_ID מסטרינג למספר אינטג'ר נקי!
+      if (obj.Branch_ID !== undefined) obj.Branch_ID = parseInt(obj.Branch_ID, 10);
 
       // 3. שדות סכומים (N12.2) -> מספרים עשרוניים (Float) ללא גרשיים
       if (obj.Amount_Before_Discount) obj.Amount_Before_Discount = Number(parseFloat(obj.Amount_Before_Discount).toFixed(2));
@@ -70,7 +72,7 @@ app.post("/api/ita-relay", async (req, res) => {
       bodyData = obj;
     }
   } catch (e) {
-    console.log("[ITA-Relay] Document Specs Normalization Error:", e.message);
+    // התעלמות משגיאות פארס בשלב האותנטיקציה (כמו ה-Unexpected token 'g' התקין של ה-OAuth)
   }
 
   console.log(`[ITA-Relay] Official Spec Body:`, JSON.stringify(bodyData));
@@ -112,4 +114,4 @@ app.post("/api/ita-relay", async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`ITA Relay running on port ${PORT}`);
- });
+});
